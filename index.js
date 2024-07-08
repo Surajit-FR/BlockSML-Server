@@ -1,11 +1,11 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const http = require('http');
-const os = require('os');
 const mongoose = require('mongoose');
+const os = require('os');
 const cors = require('cors');
 const morgan = require('morgan');
+const bodyParser = require('body-parser');
 const { ConnectToDataBase } = require('./config/database_config');
+const http = require('http');
 
 // PAYMENT
 const Webhook_Routes = require('./routes/webhook.routes');
@@ -14,7 +14,7 @@ const Payment_Routes = require('./routes/payment.routes');
 require('dotenv').config();
 
 // Database connection
-ConnectToDataBase();
+ConnectToDataBase()
 
 const app = express();
 
@@ -22,23 +22,18 @@ app.use(cors());
 app.use(express.static(__dirname + '/public'));
 app.use(morgan('dev'));
 
-// Body parsers
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Apply raw body parser for specific routes (Stripe webhook)
-app.use('/user/api', [
-    express.raw({ type: 'application/json' }),
-    Webhook_Routes,
-    Payment_Routes,
-]);
+// Socket.IO setup
+const server = http.createServer(app);
 
-// Health check endpoint
+// Server Health check
 app.get('/health', (req, res) => {
     try {
         const networkInterfaces = os.networkInterfaces();
 
-        // Extract IPv4 addresses
+        // Extract IPv4 adresses
         const IPv4Adresses = Object.values(networkInterfaces)
             .flat()
             .filter(interfaceInfo => interfaceInfo.family === 'IPv4')
@@ -64,19 +59,32 @@ app.get('/health', (req, res) => {
             return res.status(501).json({ response: message });
         }
     } catch (error) {
-        return res.status(500).json({ response: error.message });
+        return res.status(500).json({ response: error.message })
     }
 });
 
-// Default error handling middleware
+
+/* USER */
+//  API routes
+app.use('/user/api', [
+    Webhook_Routes,
+    Payment_Routes,
+]);
+
+app.get('/api/server/check', (req, res) => {
+    res.send("Hi!...I am server, Happy to see you boss...");
+});
+
+// Internal server error handeling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.log(err);
     res.status(500).json({
         status: 500,
         message: "Server Error",
-        error: err.message
+        error: err
     });
 });
+
 
 // Page not found middleware
 app.use((req, res, next) => {
@@ -89,6 +97,6 @@ app.use((req, res, next) => {
 const PORT = process.env.PORT || 4006;
 const HOST = `${process.env.HOST}:${PORT}` || `http://localhost:${PORT}`;
 
-app.listen(PORT, () => {
-    console.log(`Server connected on ${HOST}`);
+server.listen(PORT, () => {
+    console.log(`Server Connected On Port ${HOST}`)
 });
