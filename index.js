@@ -7,9 +7,12 @@ const bodyParser = require('body-parser');
 const { ConnectToDataBase } = require('./config/database_config');
 const http = require('http');
 
-// PAYMENT
-const Webhook_Routes = require('./routes/webhook.routes');
+// ROUTES
+const AuthRoutes = require('./routes/auth.routes');
 const Payment_Routes = require('./routes/payment.routes');
+const Subscription_Routes = require('./routes/subscription.routes');
+// Stripe Webhook
+const stripeWebhook = require('./routes/stripewebhook.routes');
 
 require('dotenv').config();
 
@@ -17,6 +20,9 @@ require('dotenv').config();
 ConnectToDataBase()
 
 const app = express();
+
+// Use the modular Webhook setup
+app.use('/stripe/webhook', stripeWebhook);
 
 app.use(cors());
 app.use(express.static(__dirname + '/public'));
@@ -63,13 +69,16 @@ app.get('/health', (req, res) => {
     }
 });
 
-
 /* USER */
 //  API routes
 app.use('/user/api', [
-    Webhook_Routes,
     Payment_Routes,
+    Subscription_Routes,
 ]);
+
+/* AUTH */
+// API routes
+app.use('/api', AuthRoutes);
 
 app.get('/api/server/check', (req, res) => {
     res.send("Hi!...I am server, Happy to see you boss...");
