@@ -21,8 +21,9 @@ module.exports = (UserModel) => {
             "string.max": "Password should be maximum 16 characters long !!",
             "string.pattern.base": "Password must contain at least one uppercase letter, one lowercase letter, one number & one special character !!",
         }),
+        subscription: JOI.string().allow(null).default(null),
         is_subscribed: JOI.boolean().default(false),
-    })
+    });
 
     return UserSchema.validate(UserModel);
 };

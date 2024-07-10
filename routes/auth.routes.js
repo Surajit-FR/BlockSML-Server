@@ -10,7 +10,7 @@ const ValidateUser = require('../model/validator/user.validate');
 /**************************************************** ADMIN AUTH ROUTES ****************************************************/
 
 // Sign-Up
-router.post('/register', [RequestRate.Limiter, ModelAuth(ValidateUser), DuplicateUserCheck], AuthController.RegisterRegular);
+router.post('/signup', [RequestRate.Limiter, ModelAuth(ValidateUser), DuplicateUserCheck], AuthController.RegisterRegular);
 // Login
 router.post('/login', [RequestRate.Limiter, HandleRegularLoginError], AuthController.LoginRegular);
 

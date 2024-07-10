@@ -6,7 +6,7 @@ const CreateToken = (user) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        password: user.password,
+        subscription: user.subscription,
         is_subscribed: user.is_subscribed,
     }, secret_key, { expiresIn: process.env.SESSION_TIME });
 

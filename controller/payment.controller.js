@@ -12,9 +12,9 @@ exports.CreateCheckoutSession = async (req, res) => {
                     price_data: {
                         currency: 'usd',
                         product_data: {
-                            name: product.name
+                            name: product.subscription.name
                         },
-                        unit_amount: product.price * 100,
+                        unit_amount: product.subscription.amount * 100,
                         recurring: {
                             interval: 'month'
                         }

@@ -1,5 +1,6 @@
 const SubscriptionPlanModel = require('../model/subscriptionPlan.model');
 const SubscriptionDetailModel = require('../model/subscriptionDetail.model');
+const PlanDetailModel = require('../model/planDetails.model');
 
 // AddSubscriptionPlan
 exports.AddSubscriptionPlan = async (req, res) => {
@@ -25,7 +26,19 @@ exports.AddSubscriptionPlan = async (req, res) => {
 // GetSubscriptionPlans
 exports.GetSubscriptionPlans = async (req, res) => {
     try {
-        const subscriptionPlanData = await SubscriptionPlanModel.find({});
+        const subscriptionPlanData = await PlanDetailModel.aggregate([
+            {
+                $lookup: {
+                    from: 'subscription_plans',
+                    localField: 'subscription',
+                    foreignField: '_id',
+                    as: 'subscription'
+                }
+            },
+            {
+                $unwind: "$subscription"
+            }
+        ]);
         return res.status(201).json({ success: true, message: "Subscriptions Fetched Successfully!", data: subscriptionPlanData });
     } catch (exc) {
         return res.status(500).json({ success: false, message: exc.message });
@@ -55,6 +68,27 @@ exports.GetSubscriptionDetail = async (req, res) => {
 
         return res.status(201).json({ success: true, message: subs_msg, data: subsPlanData });
 
+    } catch (exc) {
+        return res.status(500).json({ success: false, message: exc.message });
+    };
+};
+
+// AddPlanDetails
+exports.AddPlanDetails = async (req, res) => {
+    const { user, subscription, chat_inference, image_generation, youtube_video_summarization, financial_data_insight_for_stocks, news_aggregator_per_day } = req.body;
+
+    try {
+        const newPlanDetails = new PlanDetailModel({
+            user,
+            subscription,
+            chat_inference,
+            image_generation,
+            youtube_video_summarization,
+            financial_data_insight_for_stocks,
+            news_aggregator_per_day
+        });
+        await newPlanDetails.save();
+        return res.status(201).json({ success: true, message: "Plan details added successfully!" });
     } catch (exc) {
         return res.status(500).json({ success: false, message: exc.message });
     };
