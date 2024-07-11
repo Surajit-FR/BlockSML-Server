@@ -7,7 +7,7 @@ const SubscriptionPlanSchema = new Schema({
     trial_days: { type: Number, required: true },
     is_trial: { type: Boolean, default: false },
     amount: { type: Number, required: true },
-    type: { type: Number, required: true }, // 0=>Monthly, 1=>Yearly, 2=>Lifetime, 3=>Cuntom
+    type: { type: String, required: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('subscription_plan', SubscriptionPlanSchema);

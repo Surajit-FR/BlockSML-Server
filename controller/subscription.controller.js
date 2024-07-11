@@ -1,5 +1,4 @@
 const SubscriptionPlanModel = require('../model/subscriptionPlan.model');
-const SubscriptionDetailModel = require('../model/subscriptionDetail.model');
 const PlanDetailModel = require('../model/planDetails.model');
 
 // AddSubscriptionPlan

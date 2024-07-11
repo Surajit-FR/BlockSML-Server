@@ -11,6 +11,7 @@ const http = require('http');
 const AuthRoutes = require('./routes/auth.routes');
 const Payment_Routes = require('./routes/payment.routes');
 const Subscription_Routes = require('./routes/subscription.routes');
+const User_Routes = require('./routes/user.routes');
 // Stripe Webhook
 const stripeWebhook = require('./routes/stripewebhook.routes');
 
@@ -71,14 +72,15 @@ app.get('/health', (req, res) => {
 
 /* USER */
 //  API routes
-app.use('/user/api', [
+app.use('/user/api/v1', [
     Payment_Routes,
     Subscription_Routes,
+    User_Routes,
 ]);
 
 /* AUTH */
 // API routes
-app.use('/api', AuthRoutes);
+app.use('/api/v1', AuthRoutes);
 
 app.get('/api/server/check', (req, res) => {
     res.send("Hi!...I am server, Happy to see you boss...");
