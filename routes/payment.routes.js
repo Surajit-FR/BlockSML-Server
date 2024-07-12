@@ -9,6 +9,8 @@ const { VerifyToken } = require('../middleware/auth/auth_user');
 router.post('/create-checkout-session', [RequestRate.Limiter, VerifyToken], PaymentController.CreateCheckoutSession);
 // Payment Success
 router.post('/payment-success', [RequestRate.Limiter, VerifyToken], PaymentController.PaymentSuceess);
+// Billing portal
+router.post('/billing-portal', [RequestRate.Limiter, VerifyToken], PaymentController.BillingPortal);
 
 
 module.exports = router;

@@ -2,6 +2,7 @@ const JOI = require('joi');
 
 module.exports = (UserModel) => {
     const SubscriptionSchema = JOI.object({
+        customerId: JOI.string().allow("").default(""),
         sessionId: JOI.string().allow("").default(""),
         planId: JOI.string().allow("").default(""),
         planType: JOI.string().allow("").default(""),
