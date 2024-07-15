@@ -1,14 +1,32 @@
 const SubscriptionPlanModel = require('../model/subscriptionPlan.model');
 const PlanDetailModel = require('../model/planDetails.model');
+const stripe = require('../config/stripe_config');
 
 // AddSubscriptionPlan
 exports.AddSubscriptionPlan = async (req, res) => {
-    const { name, stripe_price_id, trial_days, is_trial, amount, type } = req.body;
+    const { name, trial_days, is_trial, amount, type } = req.body;
 
     try {
+        // Create a product in Stripe
+        const product = await stripe.products.create({
+            name: name,
+            type: 'service',
+        });
+
+        // Create a price in Stripe
+        const price = await stripe.prices.create({
+            unit_amount: amount * 100,
+            currency: 'usd',
+            recurring: {
+                interval: type, // "day", "week", "month" or "year"
+            },
+            product: product.id,
+        });
+
+        // Create a subscription plan in your database
         const subscriptionPlan = new SubscriptionPlanModel({
             name,
-            stripe_price_id,
+            stripe_price_id: price.id,
             trial_days,
             is_trial,
             amount,

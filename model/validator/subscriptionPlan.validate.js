@@ -8,9 +8,6 @@ module.exports = (SubscriptionPlanModel) => {
             "string.max": "Maximum length should be 60",
             "string.pattern.base": "Only alphabets and blank spaces are allowed",
         }),
-        stripe_price_id: JOI.string().required().messages({
-            "string.empty": "Stripe Price ID is required!",
-        }),
         trial_days: JOI.number().integer().min(0).required().messages({
             "number.base": "Trial days must be a number",
             "number.min": "Trial days cannot be negative",
@@ -22,11 +19,9 @@ module.exports = (SubscriptionPlanModel) => {
             "number.positive": "Amount must be positive",
             "any.required": "Amount is required",
         }),
-        type: JOI.number().integer().min(0).max(3).required().messages({
-            "number.base": "Type must be a number",
-            "number.min": "Type must be between 0 and 3",
-            "number.max": "Type must be between 0 and 3",
-            "any.required": "Type is required",
+        type: JOI.string().required().pattern(/^[a-zA-Z]+$/).messages({
+            "string.empty": "Subscription type is required!",
+            "string.pattern.base": "Only alphabets are allowed",
         })
     });
 

@@ -19,7 +19,20 @@ exports.CreateCheckoutSession = async (req, res) => {
         const existingUser = await UserModel.findOne({ _id: userID });
         if (!existingUser) {
             return res.status(404).json({ success: false, message: "User not found!" });
-        }
+        };
+
+
+        // Check if the email is already associated with another customer in Stripe
+        if (existingUser.email) {
+            const existingCustomer = await stripe.customers.list({
+                email: existingUser.email,
+                limit: 1
+            });
+
+            if (existingCustomer && existingCustomer.data.length > 0) {
+                return res.status(409).json({ success: false, message: "Email is already associated with another account." });
+            };
+        };
 
         // Create a new Stripe customer if customerId is not present
         if (!customerID) {
@@ -134,7 +147,7 @@ exports.BillingPortal = async (req, res) => {
         const customerId = decoded_token.subscription.customerId;
 
         if (!customerId) {
-            return res.status(400).json({ success: true, message: "CustomerID not found!" });
+            return res.status(400).json({ success: true, message: "You don't have any subscription to view. Please add one!" });
         };
 
         const portalSession = await stripe.billingPortal.sessions.create({

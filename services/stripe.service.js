@@ -37,7 +37,7 @@ exports.createStripeSession = async (planID, userID, customerID) => {
             success_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/success`,
             cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel`,
             metadata: {
-                userId: userID
+                userId: userID.toString()
             }
         });
 
