@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const SubscriptionSchema = new Schema({
+    subscriptionId: { type: String, default: "" },
     customerId: { type: String, default: "" },
     sessionId: { type: String, default: "" },
     planId: { type: String, default: "" },

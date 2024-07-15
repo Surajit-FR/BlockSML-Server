@@ -21,19 +21,6 @@ exports.CreateCheckoutSession = async (req, res) => {
             return res.status(404).json({ success: false, message: "User not found!" });
         };
 
-
-        // Check if the email is already associated with another customer in Stripe
-        if (existingUser.email) {
-            const existingCustomer = await stripe.customers.list({
-                email: existingUser.email,
-                limit: 1
-            });
-
-            if (existingCustomer && existingCustomer.data.length > 0) {
-                return res.status(409).json({ success: false, message: "Email is already associated with another account." });
-            };
-        };
-
         // Create a new Stripe customer if customerId is not present
         if (!customerID) {
             const customer = await stripe.customers.create({
@@ -55,6 +42,7 @@ exports.CreateCheckoutSession = async (req, res) => {
             );
         }
 
+        // Now create the Stripe checkout session
         const session = await createStripeSession(planID, userID, customerID);
 
         if (session.error) {
@@ -105,7 +93,7 @@ exports.PaymentSuceess = async (req, res) => {
 
             if (!subscriptionPlan) {
                 return res.status(404).json({ success: false, message: "Subscription plan not found!" });
-            }
+            };
 
             const customerId = subscription.customer;
             const planType = subscriptionPlan.type;
@@ -119,8 +107,9 @@ exports.PaymentSuceess = async (req, res) => {
                 { _id: userID },
                 {
                     subscription: {
-                        sessionId: "",
+                        subscriptionId: subscription.id,
                         customerId: customerId,
+                        sessionId: "",
                         planId: planId,
                         planType: planType,
                         planStartDate: startDate,
