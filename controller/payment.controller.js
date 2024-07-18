@@ -43,7 +43,7 @@ exports.CreateCheckoutSession = async (req, res) => {
         }
 
         // Now create the Stripe checkout session
-        const session = await createStripeSession(planID, userID, customerID);
+        const session = await createStripeSession(planID, userID);
 
         if (session.error) {
             return res.status(409).json({ success: false, message: session.error });
@@ -55,6 +55,7 @@ exports.CreateCheckoutSession = async (req, res) => {
             {
                 subscription: {
                     sessionId: session.id,
+                    subscriptionId: session.subscription,
                 }
             },
             { new: true }
@@ -150,4 +151,71 @@ exports.BillingPortal = async (req, res) => {
         console.log(exc.message);
         return res.status(500).json({ success: false, message: exc.message, error: "Internal Server Error" });
     };
+};
+
+// Update Subscription
+exports.UpdateSubscription = async (req, res) => {
+    const { product } = req.body;
+    const newPlanID = product.subscription.stripe_price_id;
+
+    try {
+        const decoded_token = req.decoded_token;
+        const userID = decoded_token._id;
+
+        // Check the existing user
+        const existingUser = await UserModel.findOne({ _id: userID });
+        if (!existingUser || !existingUser.subscription || !existingUser.subscription.subscriptionId) {
+            return res.status(404).json({ success: false, message: "User or subscription not found!" });
+        }
+
+        const subscriptionID = existingUser.subscription.subscriptionId;
+
+        // Retrieve the current subscription
+        const subscription = await stripe.subscriptions.retrieve(subscriptionID);
+
+        // Calculate proration for the upgrade
+        const prorationDate = Math.min(
+            moment().unix(),
+            subscription.current_period_end
+        );
+
+        // Update the subscription with proration
+        const updatedSubscription = await stripe.subscriptions.update(subscriptionID, {
+            items: [{
+                id: subscription.items.data[0].id, // ID of the current subscription item
+                price: newPlanID, // ID of the new plan
+            }],
+            proration_behavior: 'create_prorations',
+            proration_date: prorationDate,
+            expand: ['latest_invoice.payment_intent'],
+        });
+
+        // Cancel the old subscription at the end of the current period
+        await stripe.subscriptions.update(subscriptionID, {
+            cancel_at_period_end: true,
+        });
+
+        // Now create the Stripe checkout session
+        const session = await createStripeSession(newPlanID, userID);
+
+        if (session.error) {
+            return res.status(409).json({ success: false, message: session.error });
+        }
+
+        await UserModel.findByIdAndUpdate(
+            { _id: userID },
+            {
+                $set: {
+                    "subscription.sessionId": session.id,
+                    "subscription.subscriptionId": updatedSubscription.id,
+                }
+            },
+            { new: true }
+        );
+
+        return res.status(200).json({ success: true, sessionId: session.id });
+    } catch (error) {
+        console.error(error.message);
+        return res.status(500).json({ success: false, message: error.message });
+    }
 };

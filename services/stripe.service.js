@@ -1,7 +1,7 @@
 const stripe = require('../config/stripe_config');
 
 // createStripeSession
-exports.createStripeSession = async (planID, userID, customerID) => {
+exports.createStripeSession = async (planID, userID) => {
     try {
         // Create a new Stripe session
         const session = await stripe.checkout.sessions.create({
