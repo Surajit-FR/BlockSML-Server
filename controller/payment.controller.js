@@ -182,25 +182,27 @@ exports.UpdateSubscription = async (req, res) => {
         // Update the subscription with proration
         const updatedSubscription = await stripe.subscriptions.update(subscriptionID, {
             items: [{
-                id: subscription.items.data[0].id, // ID of the current subscription item
-                price: newPlanID, // ID of the new plan
+                id: subscription.items.data[0].id,
+                price: newPlanID,
             }],
             proration_behavior: 'create_prorations',
             proration_date: prorationDate,
             expand: ['latest_invoice.payment_intent'],
         });
 
-        // Cancel the old subscription at the end of the current period
-        await stripe.subscriptions.update(subscriptionID, {
-            cancel_at_period_end: true,
-        });
-
         // Now create the Stripe checkout session
         const session = await createStripeSession(newPlanID, userID);
 
         if (session.error) {
+            await stripe.subscriptions.update(subscriptionID, {
+                items: [{
+                    id: updatedSubscription.items.data[0].id,
+                    price: subscription.items.data[0].price.id,
+                }],
+                proration_behavior: 'none',
+            });
             return res.status(409).json({ success: false, message: session.error });
-        }
+        };
 
         await UserModel.findByIdAndUpdate(
             { _id: userID },
@@ -217,5 +219,5 @@ exports.UpdateSubscription = async (req, res) => {
     } catch (error) {
         console.error(error.message);
         return res.status(500).json({ success: false, message: error.message });
-    }
+    };
 };

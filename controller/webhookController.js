@@ -39,8 +39,25 @@ exports.handleStripeWebhook = async (req, res) => {
         const checkoutSession = event.data.object;
         const userEmail = await fetchCustomerEmail(checkoutSession.customer);
         if (userEmail) {
-            SendEmail(userEmail, 'Subscription Created', 'Your subscription has been successfully created.');
-        }
+            // Find the user with the temporary session ID
+            const user = await UserModel.findOne({ "subscription.sessionId": checkoutSession.id });
+
+            if (user) {
+                const existingSubscriptionId = user.subscription.subscriptionId;
+
+                if (existingSubscriptionId) {
+                    const existingSubscription = await stripe.subscriptions.retrieve(existingSubscriptionId);
+
+                    if (existingSubscription && existingSubscription.status === 'active') {
+                        await stripe.subscriptions.update(existingSubscriptionId, {
+                            cancel_at_period_end: true,
+                        });
+                    }
+                };
+
+                SendEmail(userEmail, 'Subscription Created', 'Your subscription has been successfully created.');
+            };
+        };
     } else if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object;
         const succeededEmail = await fetchCustomerEmail(paymentIntent.customer);
