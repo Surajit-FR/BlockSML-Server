@@ -12,7 +12,7 @@ exports.CreateCheckoutSession = async (req, res) => {
     try {
         const decoded_token = req.decoded_token;
         const userID = decoded_token._id;
-        const planID = product.subscription.stripe_price_id;
+        const planID = product.stripe_price_id;
         let customerID = decoded_token.subscription.customerId;
 
         // Check the existing user
@@ -156,7 +156,7 @@ exports.BillingPortal = async (req, res) => {
 // Update Subscription
 exports.UpdateSubscription = async (req, res) => {
     const { product } = req.body;
-    const newPlanID = product.subscription.stripe_price_id;
+    const newPlanID = product.stripe_price_id;
 
     try {
         const decoded_token = req.decoded_token;
