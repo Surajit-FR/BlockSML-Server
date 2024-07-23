@@ -123,8 +123,8 @@ exports.handleCustomerSubscriptionUpdated = async (subscriptionUpdated) => {
 
     const existingUser = await UserModel.findOne({ "subscription.subscriptionId": subscriptionUpdated.id });
     if (existingUser) {
-        // const currentPlanId = subscriptionUpdated.items.data[0].plan.id;
-        // const existingPlanId = existingUser.subscription.planId;
+        const currentPlanId = subscriptionUpdated.items.data[0].plan.id;
+        const existingPlanId = existingUser.subscription.planId;
 
         if (subscriptionUpdated.cancellation_details?.reason === 'cancellation_requested') {
             subscriptionDataToUpdate = {
@@ -138,29 +138,28 @@ exports.handleCustomerSubscriptionUpdated = async (subscriptionUpdated) => {
             };
             emailSubject = 'Subscription Canceled';
             emailMessage = 'Your subscription has been canceled.';
-        } 
-        // else if (currentPlanId !== existingPlanId) {
-        //     const subscriptionID = existingUser.subscription.subscriptionId;
-        //     const subscription = await stripe.subscriptions.retrieve(subscriptionID);
+        } else if (currentPlanId !== existingPlanId) {
+            const subscriptionID = existingUser.subscription.subscriptionId;
+            const subscription = await stripe.subscriptions.retrieve(subscriptionID);
 
-        //     const prorationDate = Math.min(
-        //         moment().unix(),
-        //         subscription.current_period_end
-        //     );
-        //     console.log("call 1");
-        //     await stripe.subscriptions.update(subscriptionID, {
-        //         items: [{
-        //             id: subscription.items.data[0].id,
-        //             price: currentPlanId,
-        //         }],
-        //         proration_behavior: 'create_prorations',
-        //         proration_date: prorationDate,
-        //         expand: ['latest_invoice.payment_intent'],
-        //     });
+            const prorationDate = Math.min(
+                moment().unix(),
+                subscription.current_period_end
+            );
+            
+            await stripe.subscriptions.update(subscriptionID, {
+                items: [{
+                    id: subscription.items.data[0].id,
+                    price: currentPlanId,
+                }],
+                proration_behavior: 'create_prorations',
+                proration_date: prorationDate,
+                expand: ['latest_invoice.payment_intent'],
+            });
 
-        //     emailSubject = 'Subscription Plan Updated';
-        //     emailMessage = 'Your subscription plan has been updated.';
-        // }
+            emailSubject = 'Subscription Plan Updated';
+            emailMessage = 'Your subscription plan has been updated.';
+        }
     }
 
     SendEmail(updatedEmail, emailSubject, emailMessage);
