@@ -65,7 +65,7 @@ exports.PaymentSuceess = async (req, res) => {
 
         // const session = await stripe.checkout.sessions.retrieve(sessionID, { expand: ['subscription', 'customer'] });
         const session = await stripe.checkout.sessions.retrieve(sessionID);
-        
+
         const subscriptionId = session?.subscription;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         const planId = subscription.plan.id;
@@ -174,8 +174,8 @@ exports.UpdateSubscription = async (req, res) => {
     const newPlanID = product.stripe_price_id;
 
     try {
-        const decoded_token = req.decoded_token;
-        const userID = decoded_token._id;
+        const decodedToken = req.decoded_token;
+        const userID = decodedToken._id;
 
         // Check the existing user
         const existingUser = await UserModel.findOne({ _id: userID });
@@ -205,33 +205,58 @@ exports.UpdateSubscription = async (req, res) => {
             expand: ['latest_invoice.payment_intent'],
         });
 
-        // Now create the Stripe checkout session
-        const session = await createStripeSession(newPlanID, userID);
-
-        if (session.error) {
-            await stripe.subscriptions.update(subscriptionID, {
-                items: [{
-                    id: updatedSubscription.items.data[0].id,
-                    price: subscription.items.data[0].price.id,
-                }],
-                proration_behavior: 'none',
+        if (updatedSubscription.latest_invoice?.payment_intent?.status === 'requires_payment_method') {
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: updatedSubscription.latest_invoice.amount_due,
+                currency: 'usd',
+                customer: updatedSubscription.customer,
+                payment_method: updatedSubscription.latest_invoice.payment_intent.payment_method,
+                off_session: true,
+                confirm: true,
             });
-            return res.status(409).json({ success: false, message: session.error });
-        };
 
-        await UserModel.findByIdAndUpdate(
+            // Send the client secret to the frontend
+            return res.status(402).json({
+                success: false,
+                message: 'Payment required for the subscription update.',
+                clientSecret: paymentIntent.client_secret,
+            });
+        }
+
+        // Update the user with the new subscription data
+        const subscriptionPlan = await SubscriptionPlanModel.findOne({ stripe_price_id: newPlanID });
+        if (!subscriptionPlan) {
+            return res.status(404).json({ success: false, message: "Subscription plan not found!" });
+        }
+
+        const planType = subscriptionPlan.type;
+        const startDate = moment.unix(updatedSubscription.current_period_start).format('YYYY-MM-DD');
+        const endDate = moment.unix(updatedSubscription.current_period_end).format('YYYY-MM-DD');
+        const durationInSeconds = (updatedSubscription.current_period_end - updatedSubscription.current_period_start);
+        const durationInDays = moment.duration(durationInSeconds, 'seconds').asDays();
+
+        const USER_DATA = await UserModel.findByIdAndUpdate(
             { _id: userID },
             {
-                $set: {
-                    "subscription.sessionId": session.id,
-                }
+                subscription: {
+                    subscriptionId: updatedSubscription.id,
+                    customerId: updatedSubscription.customer,
+                    sessionId: updatedSubscription.latest_invoice?.payment_intent?.id || '',
+                    planId: newPlanID,
+                    planType: planType,
+                    planStartDate: startDate,
+                    planEndDate: endDate,
+                    planDuration: durationInDays,
+                },
+                is_subscribed: true,
             },
             { new: true }
         );
 
-        return res.status(200).json({ success: true, sessionId: session.id });
+        const tokenData = CreateToken(USER_DATA);
+        return res.status(200).json({ success: true, message: "Your subscription has been updated!", data: USER_DATA, token: tokenData });
     } catch (error) {
         console.error(error.message);
         return res.status(500).json({ success: false, message: error.message });
-    };
+    }
 };
