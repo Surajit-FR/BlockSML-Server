@@ -80,7 +80,7 @@ app.use('/user/api/v1', [
 
 /* AUTH */
 // API routes
-app.use('/api/v1', AuthRoutes);
+app.use('/api/v1/auth', AuthRoutes);
 
 app.get('/api/server/check', (req, res) => {
     res.send("Hi!...I am server, Happy to see you boss...");
