@@ -14,7 +14,7 @@ exports.createStripeSession = async (planID, userID) => {
             ],
             mode: 'subscription',
             success_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/success/{CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel`,
+            cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel/{CHECKOUT_SESSION_ID}`,
             metadata: {
                 userId: userID.toString()
             }
@@ -22,6 +22,7 @@ exports.createStripeSession = async (planID, userID) => {
 
         // Replace the placeholder with the actual session ID
         session.success_url = session.success_url.replace('{CHECKOUT_SESSION_ID}', session.id);
+        session.cancel_url = session.cancel_url.replace('{CHECKOUT_SESSION_ID}', session.id);
 
         return session;
 

@@ -29,17 +29,6 @@ exports.CreateCheckoutSession = async (req, res) => {
                 metadata: { userId: userID }
             });
             customerID = customer.id;
-
-            // Update user record with the new customerId
-            await UserModel.findByIdAndUpdate(
-                { _id: userID },
-                {
-                    subscription: {
-                        customerId: customerID,
-                    }
-                },
-                { new: true }
-            );
         }
 
         // Now create the Stripe checkout session
@@ -55,7 +44,6 @@ exports.CreateCheckoutSession = async (req, res) => {
             {
                 subscription: {
                     sessionId: session.id,
-                    subscriptionId: session.subscription,
                 }
             },
             { new: true }
@@ -77,19 +65,18 @@ exports.PaymentSuceess = async (req, res) => {
 
         // const session = await stripe.checkout.sessions.retrieve(sessionID, { expand: ['subscription', 'customer'] });
         const session = await stripe.checkout.sessions.retrieve(sessionID);
+        
+        const subscriptionId = session?.subscription;
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const planId = subscription.plan.id;
+
+        // check the existingUser
+        const existingUser = await UserModel.findOne({ _id: userID });
+        if (!existingUser) {
+            return res.status(404).json({ success: false, message: "User not found!" });
+        };
 
         if (session.payment_status === "paid") {
-            const subscriptionId = session.subscription;
-            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-
-
-            // check the existingUser
-            const existingUser = await UserModel.findOne({ _id: userID });
-            if (!existingUser) {
-                return res.status(404).json({ success: false, message: "User not found!" });
-            };
-
-            const planId = subscription.plan.id;
             const subscriptionPlan = await SubscriptionPlanModel.findOne({ stripe_price_id: planId });
 
             if (!subscriptionPlan) {
@@ -123,6 +110,34 @@ exports.PaymentSuceess = async (req, res) => {
             );
             const tokenData = CreateToken(USER_DATA);
             return res.status(201).json({ success: true, message: "Payment Successfull!", data: USER_DATA, token: tokenData });
+        } else if (session.payment_status === "unpaid") {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const currentItemId = subscription.items.data[0].id;
+
+            await stripe.subscriptions.update(subscriptionId, {
+                items: [{
+                    id: currentItemId,
+                    price: planId,
+                }],
+                proration_behavior: 'none',
+            });
+
+            await UserModel.findByIdAndUpdate(
+                { _id: userID },
+                {
+                    $set: {
+                        "subscription.subscriptionId": existingUser.subscription.subscriptionId,
+                        "subscription.customerId": existingUser.subscription.customerId,
+                        "subscription.sessionId": existingUser.subscription.sessionId,
+                        "subscription.planId": existingUser.subscription.planId,
+                        "subscription.planType": existingUser.subscription.planType,
+                        "subscription.planStartDate": existingUser.subscription.planStartDate,
+                        "subscription.planEndDate": existingUser.subscription.planEndDate,
+                        "subscription.planDuration": existingUser.subscription.planDuration,
+                        "is_subscribed": existingUser.subscription.is_subscribed,
+                    }
+                }
+            );
         }
     } catch (exc) {
         console.log(exc.message);
@@ -209,7 +224,6 @@ exports.UpdateSubscription = async (req, res) => {
             {
                 $set: {
                     "subscription.sessionId": session.id,
-                    "subscription.subscriptionId": updatedSubscription.id,
                 }
             },
             { new: true }
