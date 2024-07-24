@@ -177,24 +177,16 @@ exports.UpdateSubscription = async (req, res) => {
         const decodedToken = req.decoded_token;
         const userID = decodedToken._id;
 
-        // Check the existing user
         const existingUser = await UserModel.findOne({ _id: userID });
         if (!existingUser || !existingUser.subscription || !existingUser.subscription.subscriptionId) {
             return res.status(404).json({ success: false, message: "User or subscription not found!" });
         }
 
         const subscriptionID = existingUser.subscription.subscriptionId;
-
-        // Retrieve the current subscription
         const subscription = await stripe.subscriptions.retrieve(subscriptionID);
 
-        // Calculate proration for the upgrade
-        const prorationDate = Math.min(
-            moment().unix(),
-            subscription.current_period_end
-        );
-
-        // Update the subscription with proration
+        // Calculate the prorated amount
+        const prorationDate = Math.min(moment().unix(), subscription.current_period_end);
         const updatedSubscription = await stripe.subscriptions.update(subscriptionID, {
             items: [{
                 id: subscription.items.data[0].id,
@@ -205,58 +197,46 @@ exports.UpdateSubscription = async (req, res) => {
             expand: ['latest_invoice.payment_intent'],
         });
 
-        if (updatedSubscription.latest_invoice?.payment_intent?.status === 'requires_payment_method') {
-            const paymentIntent = await stripe.paymentIntents.create({
-                amount: updatedSubscription.latest_invoice.amount_due,
-                currency: 'usd',
-                customer: updatedSubscription.customer,
-                payment_method: updatedSubscription.latest_invoice.payment_intent.payment_method,
-                off_session: true,
-                confirm: true,
-            });
+        const paymentIntentStatus = updatedSubscription?.latest_invoice?.payment_intent?.status;
 
-            // Send the client secret to the frontend
-            return res.status(402).json({
-                success: false,
-                message: 'Payment required for the subscription update.',
-                clientSecret: paymentIntent.client_secret,
-            });
-        }
+        if (paymentIntentStatus === 'succeeded') {
+            // Update user subscription in database
+            const subscriptionPlan = await SubscriptionPlanModel.findOne({ stripe_price_id: newPlanID });
+            if (!subscriptionPlan) {
+                return res.status(404).json({ success: false, message: "Subscription plan not found!" });
+            }
 
-        // Update the user with the new subscription data
-        const subscriptionPlan = await SubscriptionPlanModel.findOne({ stripe_price_id: newPlanID });
-        if (!subscriptionPlan) {
-            return res.status(404).json({ success: false, message: "Subscription plan not found!" });
-        }
+            const planType = subscriptionPlan.type;
+            const startDate = moment.unix(updatedSubscription.current_period_start).format('YYYY-MM-DD');
+            const endDate = moment.unix(updatedSubscription.current_period_end).format('YYYY-MM-DD');
+            const durationInSeconds = (updatedSubscription.current_period_end - updatedSubscription.current_period_start);
+            const durationInDays = moment.duration(durationInSeconds, 'seconds').asDays();
 
-        const planType = subscriptionPlan.type;
-        const startDate = moment.unix(updatedSubscription.current_period_start).format('YYYY-MM-DD');
-        const endDate = moment.unix(updatedSubscription.current_period_end).format('YYYY-MM-DD');
-        const durationInSeconds = (updatedSubscription.current_period_end - updatedSubscription.current_period_start);
-        const durationInDays = moment.duration(durationInSeconds, 'seconds').asDays();
-
-        const USER_DATA = await UserModel.findByIdAndUpdate(
-            { _id: userID },
-            {
-                subscription: {
-                    subscriptionId: updatedSubscription.id,
-                    customerId: updatedSubscription.customer,
-                    sessionId: updatedSubscription.latest_invoice?.payment_intent?.id || '',
-                    planId: newPlanID,
-                    planType: planType,
-                    planStartDate: startDate,
-                    planEndDate: endDate,
-                    planDuration: durationInDays,
+            const updatedUser = await UserModel.findByIdAndUpdate(
+                userID,
+                {
+                    subscription: {
+                        subscriptionId: updatedSubscription.id,
+                        customerId: updatedSubscription.customer,
+                        sessionId: updatedSubscription.latest_invoice?.payment_intent?.id || '',
+                        planId: newPlanID,
+                        planType: planType,
+                        planStartDate: startDate,
+                        planEndDate: endDate,
+                        planDuration: durationInDays,
+                    },
+                    is_subscribed: true,
                 },
-                is_subscribed: true,
-            },
-            { new: true }
-        );
+                { new: true }
+            );
 
-        const tokenData = CreateToken(USER_DATA);
-        return res.status(200).json({ success: true, message: "Your subscription has been updated!", data: USER_DATA, token: tokenData });
-    } catch (error) {
-        console.error(error.message);
-        return res.status(500).json({ success: false, message: error.message });
+            const tokenData = CreateToken(updatedUser);
+            return res.status(200).json({ success: true, message: "Your subscription has been updated!", data: updatedUser, token: tokenData });
+        } else {
+            return res.status(400).json({ success: false, message: 'Payment status is not succeeded.' });
+        }
+    } catch (exc) {
+        console.error(exc.message);
+        return res.status(500).json({ success: false, message: exc.message });
     }
 };
