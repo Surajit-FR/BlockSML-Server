@@ -13,7 +13,7 @@ exports.CreateCheckoutSession = async (req, res) => {
         const decoded_token = req.decoded_token;
         const userID = decoded_token._id;
         const planID = product.stripe_price_id;
-        let customerID = decoded_token.subscription.customerId;
+        let customerID = "";
 
         // Check the existing user
         const existingUser = await UserModel.findOne({ _id: userID });
@@ -21,7 +21,8 @@ exports.CreateCheckoutSession = async (req, res) => {
             return res.status(404).json({ success: false, message: "User not found!" });
         };
 
-        // Create a new Stripe customer if customerId is not present
+        // Use existing customer ID or create a new one if necessary
+        customerID = existingUser.subscription.customerId || "";
         if (!customerID) {
             const customer = await stripe.customers.create({
                 email: existingUser.email,
@@ -29,10 +30,17 @@ exports.CreateCheckoutSession = async (req, res) => {
                 metadata: { userId: userID }
             });
             customerID = customer.id;
+
+            // Update the user's customerId in the database
+            await UserModel.findByIdAndUpdate(
+                { _id: userID },
+                { 'subscription.customerId': customerID },
+                { new: true }
+            );
         }
 
         // Now create the Stripe checkout session
-        const session = await createStripeSession(planID, userID);
+        const session = await createStripeSession(planID, userID, customerID);
 
         if (session.error) {
             return res.status(409).json({ success: false, message: session.error });
@@ -44,6 +52,7 @@ exports.CreateCheckoutSession = async (req, res) => {
             {
                 subscription: {
                     sessionId: session.id,
+                    customerId: customerID,
                 }
             },
             { new: true }

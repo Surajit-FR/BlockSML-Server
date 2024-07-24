@@ -1,7 +1,7 @@
 const stripe = require('../config/stripe_config');
 
 // createStripeSession
-exports.createStripeSession = async (planID, userID) => {
+exports.createStripeSession = async (planID, userID, customerID,) => {
     try {
         // Create a new Stripe session
         const session = await stripe.checkout.sessions.create({
@@ -15,6 +15,7 @@ exports.createStripeSession = async (planID, userID) => {
             mode: 'subscription',
             success_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/success/{CHECKOUT_SESSION_ID}`,
             cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel/{CHECKOUT_SESSION_ID}`,
+            customer: customerID,
             metadata: {
                 userId: userID.toString()
             }

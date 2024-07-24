@@ -98,22 +98,38 @@ exports.handleCustomerSubscriptionUpdated = async (subscriptionUpdated) => {
     let emailSubject = 'Subscription Updated';
     let emailMessage = 'Your subscription has been updated.';
 
+    SendEmail(updatedEmail, emailSubject, emailMessage);
+
+    if (subscriptionStatus === 'active' && subscriptionUpdated.current_period_end) {
+        const subscriptionEndDate = new Date(subscriptionUpdated.current_period_end * 1000);
+        scheduleReminder(updatedEmail, subscriptionEndDate);
+    };
+};
+
+exports.handleCustomerSubscriptionDeleted = async (subscriptionCancel) => {
+    const updatedEmail = await fetchCustomerEmail(subscriptionCancel.customer);
+    const subscriptionStatus = subscriptionCancel.status;
+
+    let emailSubject = 'Subscription Canceled';
+    let emailMessage = 'Your subscription has been canceled.';
+
     let subscriptionDataToUpdate = {
-        'subscription.planId': subscriptionUpdated.items.data[0].plan.id || "",
-        'subscription.planType': subscriptionUpdated.items.data[0].plan.interval || "",
-        'subscription.planStartDate': subscriptionUpdated.start_date ? new Date(subscriptionUpdated.start_date * 1000) : null,
-        'subscription.planEndDate': subscriptionUpdated.current_period_end ? new Date(subscriptionUpdated.current_period_end * 1000) : null,
-        'subscription.planDuration': subscriptionUpdated.start_date && subscriptionUpdated.current_period_end ?
-            calculateDurationInDays(subscriptionUpdated.start_date * 1000, subscriptionUpdated.current_period_end * 1000) :
+        'subscription.planId': subscriptionCancel.items.data[0].plan.id || "",
+        'subscription.planType': subscriptionCancel.items.data[0].plan.interval || "",
+        'subscription.planStartDate': subscriptionCancel.start_date ? new Date(subscriptionCancel.start_date * 1000) : null,
+        'subscription.planEndDate': subscriptionCancel.current_period_end ? new Date(subscriptionCancel.current_period_end * 1000) : null,
+        'subscription.planDuration': subscriptionCancel.start_date && subscriptionCancel.current_period_end ?
+            calculateDurationInDays(subscriptionCancel.start_date * 1000, subscriptionCancel.current_period_end * 1000) :
             null,
         'is_subscribed': subscriptionStatus === 'active'
     };
 
-    if (subscriptionUpdated.cancellation_details?.reason === 'cancellation_requested') {
+    if (subscriptionCancel.cancellation_details?.reason === 'cancellation_requested') {
         subscriptionDataToUpdate = {
             ...subscriptionDataToUpdate,
             'subscription.subscriptionId': "",
-            'subscription.customerId': "",
+            'subscription.planId': "",
+            'subscription.planType': "",
             'subscription.planStartDate': null,
             'subscription.planEndDate': null,
             'subscription.planDuration': "",
@@ -123,11 +139,6 @@ exports.handleCustomerSubscriptionUpdated = async (subscriptionUpdated) => {
         emailMessage = 'Your subscription has been canceled.';
     }
     SendEmail(updatedEmail, emailSubject, emailMessage);
-
-    if (subscriptionStatus === 'active' && subscriptionUpdated.current_period_end) {
-        const subscriptionEndDate = new Date(subscriptionUpdated.current_period_end * 1000);
-        scheduleReminder(updatedEmail, subscriptionEndDate);
-    }
 
     await UserModel.findOneAndUpdate(
         { email: updatedEmail },

@@ -6,7 +6,8 @@ const {
     handlePaymentIntentPaymentFailed,
     handleInvoicePaid,
     handleInvoicePaymentFailed,
-    handleCustomerSubscriptionUpdated
+    handleCustomerSubscriptionUpdated,
+    handleCustomerSubscriptionDeleted
 } = require("../services/weebhook.service");
 
 
@@ -44,6 +45,9 @@ exports.handleStripeWebhook = async (req, res) => {
             break;
         case 'customer.subscription.updated':
             await handleCustomerSubscriptionUpdated(event.data.object);
+            break;
+        case 'customer.subscription.deleted':
+            await handleCustomerSubscriptionDeleted(event.data.object);
             break;
         default:
             console.warn(`Unhandled event type: ${event.type}`);

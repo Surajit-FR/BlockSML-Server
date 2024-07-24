@@ -79,6 +79,7 @@ exports.CancelSubscription = async (req, res) => {
             {
                 $set: {
                     is_subscribed: false,
+                    "subscription.subscriptionId": "",
                     "subscription.sessionId": "",
                     "subscription.planId": "",
                     "subscription.planType": "",
@@ -89,6 +90,10 @@ exports.CancelSubscription = async (req, res) => {
             },
             { new: true }
         );
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        };
+
         const tokenData = CreateToken(updatedUser);
         return res.status(200).json({ success: true, message: 'Subscription canceled successfully.', data: updatedUser, token: tokenData });
     } catch (exc) {
