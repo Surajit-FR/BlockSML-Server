@@ -13,8 +13,8 @@ exports.createStripeSession = async (planID, userID, customerID,) => {
                 },
             ],
             mode: 'subscription',
-            success_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/success/{CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.HOST}:${process.env.FRONTEND_PORT}/cancel/{CHECKOUT_SESSION_ID}`,
+            success_url: `${process.env.FRONTEND_HOST}/success/{CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_HOST}/cancel/{CHECKOUT_SESSION_ID}`,
             customer: customerID,
             metadata: {
                 userId: userID.toString()
