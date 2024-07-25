@@ -49,6 +49,9 @@ exports.handleStripeWebhook = async (req, res) => {
         case 'customer.subscription.deleted':
             await handleCustomerSubscriptionDeleted(event.data.object);
             break;
+        case 'charge.refund.updated':
+            await handleRefundUpdated(event.data.object);
+            break;
         default:
             console.warn(`Unhandled event type: ${event.type}`);
     }

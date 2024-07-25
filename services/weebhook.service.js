@@ -1,8 +1,10 @@
 const UserModel = require('../model/user.model');
+const RefundModel = require('../model/refund.model');
 const stripe = require('../config/stripe_config');
 const { SendEmail } = require('../helpers/send_email');
 const moment = require("moment/moment");
 const { scheduleReminder } = require('../services/notification.service');
+const { findUserById } = require('../helpers/find_user_by_credential');
 
 
 const fetchCustomerEmail = async (customerId) => {
@@ -23,14 +25,25 @@ const calculateDurationInDays = (startDate, endDate) => {
 
 // Event Handlers
 exports.handleCheckoutSessionCompleted = async (checkoutSession) => {
-    const userEmail = await fetchCustomerEmail(checkoutSession.customer);
+    const user = await findUserById(checkoutSession.metadata?.userId);
+    const userEmail = user?.email;
     if (userEmail) {
         SendEmail(userEmail, 'Subscription Created', 'Your subscription has been successfully created.');
     }
 };
 
 exports.handleCheckoutSessionAsyncPaymentFailed = async (checkoutSession) => {
-    const userEmail = await fetchCustomerEmail(checkoutSession.customer);
+    const customerId = checkoutSession.customer;
+
+    // Fetch userId using customerId from your database (assuming customerId is stored in your UserModel)
+    const user = await UserModel.findOne({ 'subscription.customerId': customerId });
+
+    if (!user) {
+        console.error('User not found for customerId:', customerId);
+        return;
+    };
+    const userEmail = user.email;
+
     if (userEmail) {
         const user = await UserModel.findOne({ "subscription.sessionId": checkoutSession.id });
         if (user) {
@@ -92,7 +105,16 @@ exports.handleInvoicePaymentFailed = async (invoice) => {
 };
 
 exports.handleCustomerSubscriptionUpdated = async (subscriptionUpdated) => {
-    const updatedEmail = await fetchCustomerEmail(subscriptionUpdated.customer);
+    const customerId = subscriptionUpdated.customer;
+
+    // Fetch userId using customerId from your database (assuming customerId is stored in your UserModel)
+    const user = await UserModel.findOne({ 'subscription.customerId': customerId });
+
+    if (!user) {
+        console.error('User not found for customerId:', customerId);
+        return;
+    };
+    const updatedEmail = user.email;
     const subscriptionStatus = subscriptionUpdated.status;
 
     let emailSubject = 'Subscription Updated';
@@ -107,7 +129,18 @@ exports.handleCustomerSubscriptionUpdated = async (subscriptionUpdated) => {
 };
 
 exports.handleCustomerSubscriptionDeleted = async (subscriptionCancel) => {
-    const updatedEmail = await fetchCustomerEmail(subscriptionCancel.customer);
+    const customerId = subscriptionCancel.customer;
+
+    // Fetch userId using customerId from your database (assuming customerId is stored in your UserModel)
+    const user = await UserModel.findOne({ 'subscription.customerId': customerId });
+
+    if (!user) {
+        console.error('User not found for customerId:', customerId);
+        return;
+    }
+
+    const userId = user._id;
+    const updatedEmail = user.email;
     const subscriptionStatus = subscriptionCancel.status;
 
     let emailSubject = 'Subscription Canceled';
@@ -127,7 +160,6 @@ exports.handleCustomerSubscriptionDeleted = async (subscriptionCancel) => {
     if (subscriptionCancel.cancellation_details?.reason === 'cancellation_requested') {
         subscriptionDataToUpdate = {
             ...subscriptionDataToUpdate,
-            'subscription.subscriptionId': "",
             'subscription.planId': "",
             'subscription.planType': "",
             'subscription.planStartDate': null,
@@ -141,7 +173,29 @@ exports.handleCustomerSubscriptionDeleted = async (subscriptionCancel) => {
     SendEmail(updatedEmail, emailSubject, emailMessage);
 
     await UserModel.findOneAndUpdate(
-        { email: updatedEmail },
+        { _id: userId },
         subscriptionDataToUpdate
     );
+};
+
+exports.handleRefundUpdated = async (refund) => {
+    const user = await findUserById(refund.metadata?.userId);
+    const userEmail = user?.email;
+    if (userEmail) {
+        SendEmail({
+            receiver: userEmail,
+            subject: 'Refund Updated',
+            htmlContent: `Your refund has been updated. Refund ID: ${refund.id}`
+        });
+    }
+
+    // Save the refund information to the database
+    const refundDocument = new RefundModel({
+        user: refund.metadata?.userId,
+        refundId: refund.id,
+        amount: refund.amount,
+        status: refund.status,
+        created: new Date(refund.created * 1000),
+    });
+    await refundDocument.save();
 };

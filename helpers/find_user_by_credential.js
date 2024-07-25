@@ -14,3 +14,9 @@ exports.findUserByCredential = async (credential) => {
 
     return user;
 };
+
+exports.findUserById = async (userId) => {
+    let user = null;
+    user = await UserModel.findOne({ _id: userId }).exec();
+    return user;
+};

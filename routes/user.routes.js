@@ -12,6 +12,8 @@ router.get('/get-user-details', [VerifyToken], UserController.GetUserDetails);
 router.get('/get-subscription-details', [VerifyToken], UserController.GetSubscriptionDetails);
 // CancelSubscription
 router.post('/cancel-subscription', [RequestRate.Limiter, VerifyToken], UserController.CancelSubscription);
+// RequestRefund
+router.post('/request-refund', [RequestRate.Limiter, VerifyToken], UserController.RequestRefund);
 
 
 module.exports = router;
